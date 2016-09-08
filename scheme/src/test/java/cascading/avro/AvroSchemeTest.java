@@ -62,7 +62,7 @@ public class AvroSchemeTest extends Assert {
 
     final Fields fields = new Fields("aBoolean", "anInt", "aLong",
                                      "aDouble", "aFloat", "aBytes", "aFixed", "aNull", "aString",
-                                     "aList", "aMap", "aUnion");
+                                     "aList", "aMap", "?cascalogString", "aUnion");
 
     String in = tempDir.getRoot().toString() + "/testRoundTrip/in";
     String out = tempDir.getRoot().toString() + "/testRoundTrip/out";
@@ -80,12 +80,12 @@ public class AvroSchemeTest extends Assert {
     BytesWritable bytesWritable2 = new BytesWritable(new byte[]{1,
         2, 3});
     Tuple tuple = new Tuple(false, 1, 2L, 3.0, 4.0F, bytesWritable2,
-                            bytesWritable, null, "test-string", aList, aMap, 5);
+                            bytesWritable, null, "test-string", aList, aMap, "cascalog rocks!", 5);
     write.add(new TupleEntry(fields, tuple));
     write.add(new TupleEntry(fields, new Tuple(false, 1, 2L,
                                                3.0, 4.0F, new BytesWritable(new byte[0]), new BytesWritable(
         new byte[]{1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4,
-            5, 6}), null, "other string", aList, aMap, null)));
+            5, 6}), null, "other string", aList, aMap, "cascalog rocks!", null)));
     write.close();
 
 
@@ -116,7 +116,8 @@ public class AvroSchemeTest extends Assert {
         .toString());
     assertEquals(1,
                  ((Map) readEntry1.getObject(10)).get("one"));
-    assertTrue(iterator.hasNext());
+    assertEquals("cascalog rocks!", readEntry1.getString(12));
+   assertTrue(iterator.hasNext());
     final TupleEntry readEntry2 = iterator.next();
 
     assertNull(readEntry2.get("aUnion"));

@@ -14,6 +14,7 @@
         {"name": "aString", "type": ["string", "null"], "default": "foobar" },
         {"name": "aList", "type":{"type":"array", "items":"int"}},
         {"name": "aMap", "type":{"type":"map", "values":"int"}},
-        {"name": "aUnion", "type":["null", "int"]}
+        {"name": "aUnion", "type":["null", "int"]},
+        {"name": "cascalogString", "type": ["string", "null"], "default": "cascalog" }
     ]
 }

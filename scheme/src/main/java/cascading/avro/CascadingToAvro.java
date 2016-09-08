@@ -14,15 +14,10 @@
 
 package cascading.avro;
 
-import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-
+import cascading.tuple.Fields;
+import cascading.tuple.Tuple;
+import cascading.tuple.TupleEntry;
+import com.google.common.base.CharMatcher;
 import org.apache.avro.AvroRuntimeException;
 import org.apache.avro.Schema;
 import org.apache.avro.Schema.Field;
@@ -32,9 +27,8 @@ import org.apache.avro.generic.GenericData.Fixed;
 import org.apache.avro.generic.GenericData.Record;
 import org.apache.hadoop.io.BytesWritable;
 
-import cascading.tuple.Fields;
-import cascading.tuple.Tuple;
-import cascading.tuple.TupleEntry;
+import java.nio.ByteBuffer;
+import java.util.*;
 
 public class CascadingToAvro {
 
@@ -60,22 +54,26 @@ public class CascadingToAvro {
         if (!(writerSchema.getFields().size() == tupleEntry.size())) {
             throw new AvroRuntimeException("Arity mismatch between incoming tuple and schema");
         }
-
-        return parseTuple(tupleEntry.getTuple(), writerSchema);
+        return parseTuple(tupleEntry.getTuple(), tupleEntry.getFields(), writerSchema);
     }
 
-    public static Object[] parseTuple(Tuple tuple, Schema writerSchema) {
+    // Helper function for dealing with Cascalog field names which begin with ? or !
+    private static String stripFieldName(String name) {
+        return CharMatcher.anyOf("?!").trimLeadingFrom(name);
+    }
+
+    public static Object[] parseTuple(Tuple tuple, Fields fields, Schema writerSchema) {
         Object[] result = new Object[writerSchema.getFields().size()];
 
         List<Field> schemaFields = writerSchema.getFields();
         for (int i = 0; i < schemaFields.size(); i++) {
-            Field field = schemaFields.get(i);
+            Field field;
+            if (fields == null || fields.size() == 0) {
+                field = schemaFields.get(i);
+            } else {
+                field = writerSchema.getField(stripFieldName(fields.get(i).toString()));
+            }
 
-            // if (!fields.contains(new Fields(field.name()))) {
-            // System.out.println(fields);
-            // throw new RuntimeException("Tuple doesn't contain field: "+
-            // field.name());
-            // }
             Object obj = tuple.getObject(i);
             result[i] = toAvro(obj, field.schema());
         }
@@ -102,7 +100,7 @@ public class CascadingToAvro {
             case RECORD:
                 Object[] objs;
                 if (obj instanceof Tuple) {
-                    objs = parseTuple((Tuple) obj, schema);
+                    objs = parseTuple((Tuple) obj, null, schema);
                 } else {
                     objs = parseTupleEntry((TupleEntry) obj, schema);
                 }

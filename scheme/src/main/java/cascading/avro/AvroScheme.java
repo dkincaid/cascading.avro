@@ -24,11 +24,13 @@ import cascading.tap.Tap;
 import cascading.tuple.Fields;
 import cascading.tuple.Tuple;
 import cascading.tuple.TupleEntry;
+import com.google.common.base.CharMatcher;
 import org.apache.avro.Schema;
 import org.apache.avro.Schema.Field;
 import org.apache.avro.file.DataFileStream;
 import org.apache.avro.generic.GenericData.Record;
 import org.apache.avro.generic.GenericDatumReader;
+import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.generic.IndexedRecord;
 import org.apache.avro.mapred.*;
 import org.apache.hadoop.fs.FileStatus;
@@ -91,20 +93,18 @@ public class AvroScheme extends Scheme<JobConf, RecordReader, OutputCollector, O
      */
     public AvroScheme(Schema schema) {
         this.schema = schema;
+        setSinkFields(Fields.ALL);
 
-        if (schema == null) {
-            setSinkFields(Fields.ALL);
-            setSourceFields(Fields.UNKNOWN);
-        } else {
+        if (schema != null) {
             Fields cascadingFields = new Fields();
-            for (Field avroField : schema.getFields()) {
+            for (Schema.Field avroField : schema.getFields()) {
                 cascadingFields = cascadingFields.append(
                         new Fields(avroField.name()));
             }
-            setSinkFields(cascadingFields);
             setSourceFields(cascadingFields);
         }
     }
+
 
     /**
      * Helper method to read in a schema when de-serializing the object
@@ -134,6 +134,11 @@ public class AvroScheme extends Scheme<JobConf, RecordReader, OutputCollector, O
         }
     }
 
+    // Helper function for dealing with Cascalog field names which begin with ? or !
+    private static String stripFieldName(String name) {
+        return CharMatcher.anyOf("?!").trimLeadingFrom(name);
+    }
+
     /**
      * Sink method to take an outgoing tuple and write it to Avro.
      *
@@ -148,10 +153,17 @@ public class AvroScheme extends Scheme<JobConf, RecordReader, OutputCollector, O
             throws IOException {
         TupleEntry tupleEntry = sinkCall.getOutgoingEntry();
 
-        IndexedRecord record = new Record((Schema) sinkCall.getContext()[0]);
+        GenericRecord record = new Record((Schema) sinkCall.getContext()[0]);
         Object[] objectArray = CascadingToAvro.parseTupleEntry(tupleEntry, (Schema) sinkCall.getContext()[0]);
+
+        Fields fields = tupleEntry.getFields();
         for (int i = 0; i < objectArray.length; i++) {
-            record.put(i, objectArray[i]);
+            if (fields == Fields.UNKNOWN) {
+                record.put(i, objectArray[i]);
+            } else {
+                String fieldName = stripFieldName(fields.get(i).toString());
+                record.put(fieldName, objectArray[i]);
+            }
         }
         //noinspection unchecked
         sinkCall.getOutput().collect(new AvroWrapper<IndexedRecord>(record), NullWritable.get());
